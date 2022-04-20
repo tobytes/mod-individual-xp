@@ -19,8 +19,8 @@ Thanks to Rochet for the assistance
 
 bool IndividualXpEnabled;
 bool IndividualXpAnnounceModule;
-uint32 MaxRate;
-uint32 DefaultRate;
+float MaxRate;
+float DefaultRate;
 
 class Individual_XP_conf : public WorldScript
 {
@@ -31,8 +31,8 @@ public:
     {
         IndividualXpAnnounceModule = sConfigMgr->GetOption<bool>("IndividualXp.Announce", 1);
         IndividualXpEnabled = sConfigMgr->GetBoolDefault("IndividualXp.Enabled", 1);
-        MaxRate = sConfigMgr->GetIntDefault("MaxXPRate", 10);
-        DefaultRate = sConfigMgr->GetIntDefault("DefaultXPRate", 1);
+        MaxRate = sConfigMgr->GetIntDefault("MaxXPRate", 10.0f);
+        DefaultRate = sConfigMgr->GetIntDefault("DefaultXPRate", 1.0f);
     }
 };
 
@@ -56,8 +56,8 @@ class PlayerXpRate : public DataMap::Base
 {
 public:
     PlayerXpRate() {}
-    PlayerXpRate(uint32 XPRate) : XPRate(XPRate) {}
-    uint32 XPRate = 1;
+    PlayerXpRate(float XPRate) : XPRate(XPRate) {}
+    float XPRate = 1.0f;
 };
 
 class Individual_XP : public PlayerScript
@@ -75,7 +75,7 @@ public:
         else
         {
             Field* fields = result->Fetch();
-            p->CustomData.Set("Individual_XP", new PlayerXpRate(fields[0].Get<uint32>()));
+            p->CustomData.Set("Individual_XP", new PlayerXpRate(fields[0].Get<float>()));
         }
     }
 
@@ -83,7 +83,7 @@ public:
     {
         if (PlayerXpRate* data = p->CustomData.Get<PlayerXpRate>("Individual_XP"))
         {
-            uint32 rate = data->XPRate;
+            float rate = data->XPRate;
             CharacterDatabase.DirectExecute("REPLACE INTO `individualxp` (`CharacterGUID`, `XPRate`) VALUES ('{}', '{}');", p->GetGUID().GetCounter(), rate);
         }
     }
@@ -92,7 +92,7 @@ public:
     {
         if (IndividualXpEnabled) {
             if (PlayerXpRate* data = p->CustomData.Get<PlayerXpRate>("Individual_XP"))
-                amount *= data->XPRate;
+                amount = (uint32)(amount * data->XPRate);
         }
     }
 
@@ -158,7 +158,7 @@ public:
         }
         else
         {
-            me->GetSession()->SendAreaTriggerMessage("Your current XP rate is %u", me->CustomData.GetDefault<PlayerXpRate>("Individual_XP")->XPRate);
+            me->GetSession()->SendAreaTriggerMessage("Your current XP rate is %f", me->CustomData.GetDefault<PlayerXpRate>("Individual_XP")->XPRate);
         }
         return true;
     }
@@ -180,22 +180,22 @@ public:
         if (!me)
             return false;
 
-        uint32 rate = (uint32)atol(args);
+        float rate = (float)atof(args);
         if (rate > MaxRate)
         {
-            handler->PSendSysMessage("[XP] The maximum rate limit is %u.", MaxRate);
+            handler->PSendSysMessage("[XP] The maximum rate limit is %f.", MaxRate);
             handler->SetSentErrorMessage(true);
             return false;
         }
-        else if (rate == 0)
+        else if (rate < 0.1f)
         {
-            handler->PSendSysMessage("[XP] The minimum rate limit is 1.");
+            handler->PSendSysMessage("[XP] The minimum rate limit is 0.1");
             handler->SetSentErrorMessage(true);
             return false;
         }
 
         me->CustomData.GetDefault<PlayerXpRate>("Individual_XP")->XPRate = rate;
-        me->GetSession()->SendAreaTriggerMessage("You have updated your XP rate to %u", rate);
+        me->GetSession()->SendAreaTriggerMessage("You have updated your XP rate to %f", rate);
         return true;
     }
 
@@ -253,7 +253,7 @@ public:
             return false;
 
         me->CustomData.GetDefault<PlayerXpRate>("Individual_XP")->XPRate = DefaultRate;
-        me->GetSession()->SendAreaTriggerMessage("You have restored your XP rate to the default value of %u", DefaultRate);
+        me->GetSession()->SendAreaTriggerMessage("You have restored your XP rate to the default value of %f", DefaultRate);
         return true;
     }
 };
